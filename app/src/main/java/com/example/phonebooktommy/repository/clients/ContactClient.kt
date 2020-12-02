@@ -2,7 +2,7 @@ package com.example.phonebooktommy.repository.clients
 
 import android.util.Log
 import com.example.phonebooktommy.BuildConfig
-import com.example.phonebooktommy.repository.services.addContactService
+import com.example.phonebooktommy.repository.services.ContactService
 import com.example.phonebooktommy.repository.utils.ConstantUtil
 import com.google.gson.GsonBuilder
 
@@ -13,7 +13,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 class ContactClient {
     companion object {
-        val SERVICE_ADD: addContactService by lazy {
+        val SERVICE: ContactService by lazy {
             val httpLoggingInterceptor = HttpLoggingInterceptor { message ->
                 if (BuildConfig.DEBUG) Log.e("LOG_API", message)
             }
@@ -32,7 +32,7 @@ class ContactClient {
                     GsonConverterFactory.create(GsonBuilder().setLenient().create())
                 )
                 .build()
-            retrofit.create(addContactService::class.java)
+            retrofit.create(ContactService::class.java)
         }
     }
 }

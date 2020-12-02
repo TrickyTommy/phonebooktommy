@@ -3,13 +3,16 @@ package com.example.phonebooktommy.viewmodels
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.*
+import com.example.phonebooktommy.repository.App
+import com.example.phonebooktommy.repository.ContactLocalRepository
+import com.example.phonebooktommy.repository.ContactRemoteRepository
+import com.example.phonebooktommy.repository.UserSession
 import com.example.phonebooktommy.repository.clients.ContactClient
+import com.example.phonebooktommy.repository.request.AddContactRequest
 import com.example.phonebooktommy.repository.responses.ContactResponse
 import com.example.phonebooktommy.repository.utils.SessionUtil
+import com.example.phonebooktommy.views.states.ContactState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import okhttp3.MultipartBody
@@ -20,55 +23,38 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 
-sealed class ContactState {
-    data class Loading(val message: String = "Loading...") : ContactState()
-    data class Error(val exception: Exception) : ContactState()
-    data class Create(val data: ContactResponse) : ContactState()
+@Suppress("UNCHECKED_CAST")
+class AddContactViewModelFactory(
+    private val remoteRepository: ContactRemoteRepository,
+    private val localRepository: ContactLocalRepository
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel?> create(modelClass: Class<T>): T {
+        return AddContactViewModel(remoteRepository, localRepository) as T
+    }
 }
 
-class addContactViewModel(private val app: Application) : AndroidViewModel(app) {
-    private val contactService by lazy { ContactClient.SERVICE_ADD }
+class AddContactViewModel (
+    private val remoteRepository: ContactRemoteRepository,
+    private val localRepository: ContactLocalRepository,
+) : ViewModel() {
     private val mutableState by lazy { MutableLiveData<ContactState>() }
-    private val token by lazy { SessionUtil(app.applicationContext).token }
     val state: LiveData<ContactState> get() = mutableState
+    private val token by lazy {
+        UserSession(App.instance).token
+    }
 
-    fun insertContact(phone: String, name: String, image: String) {
+    fun insertContact(bodyAddContact: AddContactRequest) {
         mutableState.value = ContactState.Loading()
-
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val body = hashMapOf<String, RequestBody>()
-                body["phone"] = phone.toRequestBody(MultipartBody.FORM)
-                body["name"] = name.toRequestBody(MultipartBody.FORM)
-
-                val file = File(image)
-                var photo: MultipartBody.Part? = null
-
-                if (image.isNotEmpty() && file.exists()) {
-                    val bitmap = BitmapFactory.decodeFile(image)
-                    val bos = ByteArrayOutputStream()
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 50, bos)
-
-                    FileOutputStream(image, true).apply {
-                        write(bos.toByteArray())
-                        flush()
-                        close()
-                    }
-
-                    val fileBody = file.asRequestBody(MultipartBody.FORM)
-                    photo = MultipartBody.Part.createFormData(
-                        "image",
-                        file.name,
-                        fileBody
-                    )
-                }
-
-                val contactModel = contactService.insertContact(token, body, photo).data
-                mutableState.postValue(ContactState.Create(contactModel))
+                val contact = remoteRepository.addContact(token!!, bodyAddContact)
+                mutableState.postValue(ContactState.SuccessInsertContact(contact.data))
             } catch (exc: Exception) {
+
                 exc.printStackTrace()
                 mutableState.postValue(ContactState.Error(exc))
             }
         }
     }
+
 }

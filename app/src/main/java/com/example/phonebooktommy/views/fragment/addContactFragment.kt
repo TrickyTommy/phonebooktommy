@@ -13,189 +13,88 @@ import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.core.content.FileProvider
 import androidx.fragment.app.viewModels
 import com.bumptech.glide.Glide
 import com.example.phonebooktommy.databinding.FragmentAddContactBinding
-import com.example.phonebooktommy.viewmodels.ContactState
-import com.example.phonebooktommy.viewmodels.addContactViewModel
+import com.example.phonebooktommy.repository.ContactLocalRepository
+import com.example.phonebooktommy.repository.ContactRemoteRepository
+import com.example.phonebooktommy.repository.ContactRemoteRepositoryImpl
+import com.example.phonebooktommy.viewmodels.AddContactViewModel
+import com.example.phonebooktommy.viewmodels.AddContactViewModelFactory
+import com.example.phonebooktommy.views.states.ContactState
+
 import java.io.*
 import java.text.SimpleDateFormat
 import java.util.*
 
-class addContactFragment : Fragment() {
+class AddFragment : Fragment() {
 
+    lateinit var binding: FragmentAddContactBinding
+    private val service: ContactService by lazy { Api.contactService }
+    private val dao: ContactDao by lazy { LocalDB.getDB(requireContext()).dao() }
+    private val remoteRepository: ContactRemoteRepository by lazy { ContactRemoteRepositoryImpl(service) }
+    private val localRepository: ContactLocalRepository by lazy { ContactLocalRepositoryImpl(dao) }
+    private val viewModelFactory by lazy { AddContactViewModelFactory(remoteRepository, localRepository) }
+    private val viewModel by viewModels<AddContactViewModel> { viewModelFactory }
 
-    private val requestPermissions = 111
-    private val permissions = arrayOf(
-        Manifest.permission.READ_EXTERNAL_STORAGE,
-        Manifest.permission.WRITE_EXTERNAL_STORAGE
-    )
-    private var filePath = ""
-    private lateinit var binding: FragmentAddContactBinding
-
-    private val requestImageCamera = 123
-    private val requestImageGallery = 321
-
-    private val contactViewModel by viewModels<addContactViewModel>()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View {
-        binding = FragmentAddContactBinding.inflate(layoutInflater, container, false).apply {
-            ivContact.setOnClickListener { showOption() }
-            btnCreate.setOnClickListener {
-                contactViewModel.insertContact(
-                    tiePhone.text.toString(),
-                    tieName.text.toString(),
-                    filePath
-                )
-            }
+    ): View? {
+        binding = FragmentAddBinding.inflate(inflater, container, false)
 
-            contactViewModel.state.observe(viewLifecycleOwner) {
-                when (it) {
-                    is ContactState.Loading -> {
-                        btnCreate.visibility = View.GONE
-                    }
-                    is ContactState.Create -> {
-                        btnCreate.visibility = View.VISIBLE
-                    }
-                    is ContactState.Error -> {
-                        btnCreate.visibility = View.VISIBLE
-                    }
-                }
-            }
-        }
-
+        setView()
+        setObserver()
         return binding.root
     }
 
-    private fun showOption() {
-        val builder = AlertDialog.Builder(requireContext())
-        builder.setTitle("Pilih gambari dari mana?")
-        builder.setItems(arrayOf("Camera", "Gallery")) { dialog, index ->
-            dialog.dismiss()
-            if (index == 0) captureImageFromCamera()
-            else captureImageFromGallery()
-        }
-        builder.setNegativeButton("Batal") { dialog, _ -> dialog.dismiss() }
-        builder.create().show()
-    }
-
-    @SuppressLint("SimpleDateFormat")
-    private fun createImageFile(): File {
-        deleteFileTemp()
-
-        val timeStamp: String = SimpleDateFormat("yyyy_MM_dd_HH_mm_ss").format(Date())
-        val storageDir: File? =
-            requireActivity().getExternalFilesDir(Environment.DIRECTORY_PICTURES)
-        return File.createTempFile("IMG_${timeStamp}", ".jpg", storageDir).apply {
-            filePath = absolutePath
-        }
-    }
-
-    private fun captureImageFromGallery() {
-        val gallery = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.INTERNAL_CONTENT_URI)
-        startActivityForResult(gallery, requestImageGallery)
-    }
-
-    @SuppressLint("QueryPermissionsNeeded")
-    private fun captureImageFromCamera() {
-        Intent(MediaStore.ACTION_IMAGE_CAPTURE).also { takePictureIntent ->
-            takePictureIntent.resolveActivity(requireActivity().packageManager)?.also {
-                val photoFile: File? = try {
-                    createImageFile()
-                } catch (ex: IOException) {
-                    null
-                }
-
-                photoFile?.also {
-                    val photoURI: Uri = FileProvider.getUriForFile(
-                        requireContext(),
-                        "com.example.android.fileprovider",
-                        it
+    private fun setView(){
+        binding.run {
+            btAddContact.setOnClickListener {
+                viewModel.insertContact(
+                    BodyAddContact(
+                        etAddContactName.text.toString(),
+                        etAddContactPhone.text.toString(),
+                        etAddContactJob.text.toString(),
+                        etAddContactCompany.text.toString(),
+                        etAddContactEmail.text.toString()
                     )
-                    takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
-                    startActivityForResult(takePictureIntent, requestImageCamera)
+                )
+            }
+        }
+    }
+    private fun setObserver(){
+        viewModel.state.observe(viewLifecycleOwner){
+            when(it){
+                is ContactAddState.Loading -> showLoading(true)
+                is ContactAddState.Error -> {
+                    showLoading(false)
+                    showMessage(it.exception.message ?: "Oops something went wrong")
                 }
-            }
-        }
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-
-        if (requestCode == requestImageCamera && resultCode == Activity.RESULT_OK) {
-            Glide.with(this).load(filePath).into(binding.ivContact)
-        } else if (requestCode == requestImageGallery && resultCode == Activity.RESULT_OK) {
-            val image = try {
-                createImageFile()
-            } catch (exc: Exception) {
-                null
-            }
-
-            image?.let {
-                val bitmap = data?.data
-                bitmap?.let { imageBitmap ->
-                    val inputStream = requireActivity().contentResolver.openInputStream(imageBitmap)
-                    val fileOutputStream = FileOutputStream(filePath)
-
-                    inputStream?.let { input ->
-                        try {
-                            copyStream(input, fileOutputStream)
-                        } catch (exc: Exception) {
-                            exc.printStackTrace()
-                        }
-                    }
-
-                    fileOutputStream.close()
-                    inputStream?.close()
-
-                    Glide.with(this).load(filePath).into(binding.ivContact)
+                is ContactAddState.SuccessInsertContact -> {
+                    showLoading(false)
+                    requireActivity().onBackPressed()
                 }
+                else -> throw Exception("Unsupported state type")
+
             }
-        } else {
-            deleteFileTemp()
         }
     }
 
-    @Throws(IOException::class)
-    fun copyStream(input: InputStream, output: OutputStream) {
-        val buffer = ByteArray(1024)
-        var bytesRead: Int
-        while (input.read(buffer).also { bytesRead = it } != -1) {
-            output.write(buffer, 0, bytesRead)
+    private fun showLoading(state: Boolean){
+        binding.apply {
+            btAddContact.text = if (state) "" else "add"
+            pbAdd.visibility = if (state) View.VISIBLE else View.GONE
         }
     }
 
-    private fun deleteFileTemp() {
-        val file = File(filePath)
-        if (file.exists() && file.delete()) {
-            println("File dengan alamat ${file.absolutePath} berhasil dihapus")
-        }
+    private fun showMessage(message: String) {
+        Toast.makeText(requireActivity(), message, Toast.LENGTH_SHORT).show()
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
 
-        deleteFileTemp()
-    }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == requestPermissions && grantResults.size != permissions.size) {
-            requestPermissions(permissions, requestPermissions)
-        }
-    }
-
-    override fun onStart() {
-        super.onStart()
-
-        requestPermissions(permissions, requestPermissions)
-    }
 }
