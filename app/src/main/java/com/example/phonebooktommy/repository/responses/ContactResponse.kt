@@ -2,7 +2,7 @@ package com.example.phonebooktommy.repository.responses
 
 import com.google.gson.annotations.SerializedName
 
-data class addContactResponse(
+data class ContactResponse(
 
 	val image: Any,
 	val phone: String,

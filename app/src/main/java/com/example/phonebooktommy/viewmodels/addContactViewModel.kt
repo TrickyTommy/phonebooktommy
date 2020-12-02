@@ -8,7 +8,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.example.phonebooktommy.repository.clients.ContactClient
-import com.example.phonebooktommy.repository.responses.addContactResponse
+import com.example.phonebooktommy.repository.responses.ContactResponse
 import com.example.phonebooktommy.repository.utils.SessionUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -23,7 +23,7 @@ import java.io.FileOutputStream
 sealed class ContactState {
     data class Loading(val message: String = "Loading...") : ContactState()
     data class Error(val exception: Exception) : ContactState()
-    data class Create(val data: addContactResponse) : ContactState()
+    data class Create(val data: ContactResponse) : ContactState()
 }
 
 class addContactViewModel(private val app: Application) : AndroidViewModel(app) {
