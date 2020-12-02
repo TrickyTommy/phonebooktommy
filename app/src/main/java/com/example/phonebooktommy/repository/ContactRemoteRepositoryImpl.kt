@@ -32,7 +32,6 @@ class ContactRemoteRepositoryImpl(private val service: ContactService) : Contact
         )
     }
 
-
     override suspend fun updateContact(
         token: String,
         id: Int,
@@ -47,7 +46,10 @@ class ContactRemoteRepositoryImpl(private val service: ContactService) : Contact
             RequestBody.create(MediaType.parse("text/plain"), addContactRequest.job),
             RequestBody.create(MediaType.parse("text/plain"), addContactRequest.company)
         )
+
+
     }
 
 
 }
+

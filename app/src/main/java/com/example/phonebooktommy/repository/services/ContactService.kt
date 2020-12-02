@@ -1,7 +1,6 @@
 package com.example.phonebooktommy.repository.services
 
 
-import com.example.phonebooktommy.repository.responses.ContactModel
 import com.example.phonebooktommy.repository.responses.BaseResponse
 import com.example.phonebooktommy.repository.responses.ContactResponse
 import okhttp3.RequestBody
