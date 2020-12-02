@@ -3,6 +3,7 @@ package com.example.phonebooktommy.views.adapter
 import android.content.Context
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.example.phonebooktommy.databinding.ItemListBinding
 import com.example.phonebooktommy.repository.responses.ContactResponse
 
@@ -14,6 +15,12 @@ class ContactAdapter(private val context: Context, private val listener: contacL
     ) : RecyclerView.ViewHolder(binding.root){
         fun bindData(contactModel:ContactResponse) {
             binding.run {
+                tvName.text=contactModel.name
+                tvPhone.text=contactModel.phone
+
+                Glide.with(binding.root).load(contactModel.image).into(ivAvatar)
+
+                root.setOnClickListener { listener.onClick(contactModel)}
 
             }
         }
@@ -21,7 +28,8 @@ class ContactAdapter(private val context: Context, private val listener: contacL
     }
 
     interface contacListener {
-
+        fun onClick(productModel: ContactResponse)
+        fun onDelete(productModel: ContactResponse)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ContactAdapter.ViewHolder {
